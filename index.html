@@ -1,0 +1,273 @@
+<script>
+  // URL Google Apps Script
+  const API_URL = "https://script.google.com/macros/s/AKfycbwmT0TXHrrCO6dUh7Pq1RuftvldweovvbncHQiZDVCv9ZxeIzMXa84dOmNTiKoHtqZd4A/exec";
+
+  // Nomor WhatsApp Admin
+  const WA_ADMIN = "62895401252983";
+
+  // Data produk contoh
+  let products = [
+    {
+      id: 1,
+      nama: "Blouse Elegan Nadia",
+      kategori: "Pakaian",
+      deskripsi: "Blouse nyaman untuk gaya sehari-hari.",
+      harga: 149000,
+      stok: 12,
+      foto: "https://images.unsplash.com/photo-1551163943-3f6a855d1153?auto=format&fit=crop&w=700&q=80"
+    },
+    {
+      id: 2,
+      nama: "Classic Shoulder Bag",
+      kategori: "Tas",
+      deskripsi: "Tas simpel dengan desain elegan.",
+      harga: 199000,
+      stok: 8,
+      foto: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=700&q=80"
+    },
+    {
+      id: 3,
+      nama: "Golden Jewelry Set",
+      kategori: "Perhiasan",
+      deskripsi: "Aksesori manis untuk melengkapi gayamu.",
+      harga: 89000,
+      stok: 15,
+      foto: "https://images.unsplash.com/photo-1611652022419-a9419f74343d?auto=format&fit=crop&w=700&q=80"
+    },
+    {
+      id: 4,
+      nama: "Mini Bag Classic",
+      kategori: "Aksesori",
+      deskripsi: "Tas mini untuk acara santai maupun formal.",
+      harga: 129000,
+      stok: 10,
+      foto: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=700&q=80"
+    }
+  ];
+
+  let cart = [];
+
+  function rupiah(value) {
+    return "Rp " + Number(value || 0).toLocaleString("id-ID");
+  }
+
+  // Mengambil produk dari Google Apps Script
+  async function loadProducts() {
+    try {
+      const response = await fetch(API_URL);
+      if (!response.ok) throw new Error("Gagal mengambil data produk");
+
+      const data = await response.json();
+
+      // Mendukung respons berbentuk array atau { data: [...] }
+      const productList = Array.isArray(data) ? data : data.data;
+
+      if (Array.isArray(productList) && productList.length > 0) {
+        products = productList;
+      }
+    } catch (error) {
+      console.error("Gagal memuat produk dari Google Sheets:", error);
+      console.log("Menggunakan produk contoh.");
+    }
+
+    renderProducts();
+    updateCartUI();
+  }
+
+  // Menampilkan produk
+  function renderProducts() {
+    const grid = document.getElementById("product-grid");
+    grid.innerHTML = "";
+
+    products.forEach(product => {
+      const card = document.createElement("article");
+      card.className =
+        "bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition flex flex-col";
+
+      const image = document.createElement("img");
+      image.src = product.foto || "https://placehold.co/600x500?text=Foto+Produk";
+      image.alt = product.nama || "Foto produk";
+      image.className = "h-56 w-full object-cover bg-stone-100";
+
+      image.onerror = function () {
+        this.src = "https://placehold.co/600x500?text=Foto+Produk";
+      };
+
+      const content = document.createElement("div");
+      content.className = "p-4 flex-1 flex flex-col justify-between";
+
+      const details = document.createElement("div");
+
+      const category = document.createElement("span");
+      category.className =
+        "text-xs font-semibold bg-amber-50 text-amber-800 px-2.5 py-1 rounded-full";
+      category.textContent = product.kategori || "Umum";
+
+      const name = document.createElement("h3");
+      name.className = "font-bold text-stone-900 text-lg mt-3";
+      name.textContent = product.nama || "Produk";
+
+      const description = document.createElement("p");
+      description.className = "text-xs text-slate-500 mt-1";
+      description.textContent = product.deskripsi || "";
+
+      const stock = document.createElement("p");
+      stock.className = "text-xs text-slate-400 mt-2";
+      stock.textContent = "Sisa stok: " + (product.stok ?? 0);
+
+      details.append(category, name, description, stock);
+
+      const bottom = document.createElement("div");
+      bottom.className =
+        "mt-4 pt-3 border-t flex items-center justify-between gap-2";
+
+      const price = document.createElement("span");
+      price.className = "font-extrabold text-amber-700 text-sm";
+      price.textContent = rupiah(product.harga);
+
+      const button = document.createElement("button");
+      button.className =
+        "bg-stone-800 text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-amber-800 transition";
+      button.textContent = "+ Keranjang";
+      button.disabled = Number(product.stok) <= 0;
+      button.onclick = () => addToCart(product.id);
+
+      bottom.append(price, button);
+      content.append(details, bottom);
+      card.append(image, content);
+      grid.append(card);
+    });
+  }
+
+  // Tambah produk ke keranjang
+  function addToCart(id) {
+    const product = products.find(item => String(item.id) === String(id));
+    if (!product) return;
+
+    const existing = cart.find(item => String(item.id) === String(id));
+    const currentQty = existing ? existing.qty : 0;
+
+    if (currentQty >= Number(product.stok || 0)) {
+      alert("Maaf, stok produk tidak mencukupi.");
+      return;
+    }
+
+    if (existing) {
+      existing.qty++;
+    } else {
+      cart.push({ ...product, qty: 1 });
+    }
+
+    updateCartUI();
+  }
+
+  // Memperbarui tampilan keranjang
+  function updateCartUI() {
+    document.getElementById("cart-count").textContent =
+      cart.reduce((sum, item) => sum + item.qty, 0);
+
+    const container = document.getElementById("cart-items");
+    container.innerHTML = "";
+
+    let total = 0;
+
+    if (cart.length === 0) {
+      container.innerHTML =
+        '<p class="text-center text-slate-400 text-sm py-8">Keranjang kamu masih kosong.</p>';
+    }
+
+    cart.forEach((item, index) => {
+      total += Number(item.harga) * item.qty;
+
+      const row = document.createElement("div");
+      row.className =
+        "flex justify-between items-center gap-3 bg-stone-50 p-3 rounded-xl text-sm border border-stone-100";
+
+      const info = document.createElement("div");
+
+      const name = document.createElement("p");
+      name.className = "font-semibold text-stone-800";
+      name.textContent = item.nama;
+
+      const price = document.createElement("p");
+      price.className = "text-xs text-slate-500 mt-1";
+      price.textContent = rupiah(item.harga) + " × " + item.qty;
+
+      info.append(name, price);
+
+      const controls = document.createElement("div");
+      controls.className = "flex items-center gap-2";
+
+      const minus = document.createElement("button");
+      minus.className = "border rounded px-2 py-1";
+      minus.textContent = "−";
+      minus.onclick = () => {
+        item.qty--;
+        if (item.qty <= 0) cart.splice(index, 1);
+        updateCartUI();
+      };
+
+      const plus = document.createElement("button");
+      plus.className = "border rounded px-2 py-1";
+      plus.textContent = "+";
+      plus.onclick = () => addToCart(item.id);
+
+      controls.append(minus, plus);
+      row.append(info, controls);
+      container.append(row);
+    });
+
+    document.getElementById("cart-total").textContent = rupiah(total);
+  }
+
+  // Membuka atau menutup keranjang
+  function toggleCart() {
+    const modal = document.getElementById("cart-modal");
+    modal.classList.toggle("hidden");
+    modal.classList.toggle("flex");
+    updateCartUI();
+  }
+
+  // Checkout melalui WhatsApp
+  function handleCheckout(event) {
+    event.preventDefault();
+
+    if (cart.length === 0) {
+      alert("Keranjang belanja masih kosong!");
+      return;
+    }
+
+    const nama = document.getElementById("cust-name").value.trim();
+    const whatsapp = document.getElementById("cust-phone").value.trim();
+    const alamat = document.getElementById("cust-address").value.trim();
+
+    const total = cart.reduce(
+      (sum, item) => sum + Number(item.harga) * item.qty, 0
+    );
+
+    let message =
+      "Halo Admin Toko Nadia, saya ingin memesan produk berikut:\n\n";
+    message += "Nama: " + nama + "\n";
+    message += "No. WhatsApp: " + whatsapp + "\n";
+    message += "Alamat: " + alamat + "\n\n";
+    message += "Daftar pesanan:\n";
+
+    cart.forEach(item => {
+      message +=
+        "• " + item.nama + " (" + item.qty + "x) = " +
+        rupiah(Number(item.harga) * item.qty) + "\n";
+    });
+
+    message += "\nTotal: " + rupiah(total);
+    message += "\nMohon konfirmasi pesanan dan ongkir. Terima kasih.";
+
+    window.open(
+      "https://wa.me/" + WA_ADMIN + "?text=" + encodeURIComponent(message),
+      "_blank"
+    );
+  }
+
+  // Jalankan website
+  updateCartUI();
+  loadProducts();
+</script>
